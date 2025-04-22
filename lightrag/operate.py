@@ -18,6 +18,8 @@ from .utils import (
     normalize_extracted_info,
     pack_user_ass_to_openai_messages,
     split_string_by_multi_markers,
+    extract_fixed_parenthesized_content_close_schema,
+    extract_fixed_parenthesized_content_open_schema,
     truncate_list_by_token_size,
     process_combine_contexts,
     compute_args_hash,
@@ -478,6 +480,7 @@ async def extract_entities(
 ) -> None:
     use_llm_func: callable = global_config["llm_model_func"]
     entity_extract_max_gleaning = global_config["entity_extract_max_gleaning"]
+    fixed_parenthesized_strategy = global_config["fixed_parenthesized_strategy"]
 
     ordered_chunks = list(chunks.items())
     # add language and example number params to prompt
@@ -548,6 +551,11 @@ async def extract_entities(
             result,
             [context_base["record_delimiter"], context_base["completion_delimiter"]],
         )
+
+        if fixed_parenthesized_strategy == "close_schema":
+            records = extract_fixed_parenthesized_content_close_schema(records)
+        elif fixed_parenthesized_strategy == "open_schema":
+            records = extract_fixed_parenthesized_content_open_schema(records)
 
         for record in records:
             record = re.search(r"\((.*)\)", record)

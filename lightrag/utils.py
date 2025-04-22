@@ -408,6 +408,113 @@ def split_string_by_multi_markers(content: str, markers: list[str]) -> list[str]
     return [r.strip() for r in results if r.strip()]
 
 
+def extract_fixed_parenthesized_content_close_schema(records: list[str]) -> list[str]:
+    """
+    Extract content that should be in parentheses from each record.
+    Ensures each extracted item has both opening and closing parentheses.
+    """
+    result = []
+
+    for record in records:
+        # First, extract properly matched pairs
+        balanced_matches = re.findall(r"\((.*?)\)", record)
+        for match in balanced_matches:
+            result.append(f"({match})")
+
+        # Process string to handle unbalanced parentheses
+        # For opening without closing
+        open_matches = re.findall(r"\(([^()]*?)$", record)
+        for match in open_matches:
+            result.append(f"({match})")
+
+        # For closing without opening
+        close_matches = re.findall(r"^([^()]*?)\)", record)
+        for match in close_matches:
+            result.append(f"({match})")
+
+    return result
+
+
+def extract_fixed_parenthesized_content_open_schema(records: list[str]) -> list[str]:
+    """
+    Extract content that should be in parentheses, handling:
+    1. Nested parentheses
+    2. Multiple entities with missing delimiters
+    3. Double parentheses
+    4. Missing opening or closing parentheses
+    """
+    result = []
+    
+    for record in records:
+        i = 0
+        while i < len(record):
+            # Case 1: Found opening parenthesis - start of a potential entity
+            if record[i] == '(':
+                start = i
+                depth = 1
+                i += 1
+                
+                # Track through content looking for closing parenthesis
+                while i < len(record) and depth > 0:
+                    if record[i] == '(':
+                        depth += 1
+                    elif record[i] == ')':
+                        depth -= 1
+                    i += 1
+                
+                # Extract the entity with exactly one pair of parentheses
+                if depth == 0:  # Found balanced parentheses
+                    content = record[start+1:i-1]  # Remove outer parentheses
+                    result.append(f"({content})")
+                else:  # Unbalanced - missing closing parenthesis
+                    content = record[start+1:]
+                    result.append(f"({content})")
+            
+            # Case 2: No opening parenthesis but looks like content
+            # This handles cases where entities are concatenated without proper separators
+            elif (i == 0 or record[i-1] == ')'):
+                # Look for entity marker from current position
+                next_marker = record.find("<|>", i)
+                
+                if next_marker != -1:
+                    # Found what looks like entity content
+                    possible_entity_end = record.find(')', next_marker)
+                    
+                    if possible_entity_end != -1:
+                        # Found closing parenthesis after marker
+                        content = record[i:possible_entity_end]
+                        result.append(f"({content})")
+                        i = possible_entity_end + 1
+                    else:
+                        # No closing parenthesis - take until end of string
+                        content = record[i:]
+                        result.append(f"({content})")
+                        break
+                else:
+                    # No entity marker found, move to next character
+                    i += 1
+            else:
+                i += 1
+    
+    # Final processing to clean up results
+    clean_results = []
+    for item in result:
+        # Strip extra parentheses
+        content = item
+        while content.startswith('((') and content.endswith('))'):
+            content = content[1:-1]
+        
+        # Ensure it has exactly one pair of parentheses
+        if content.startswith('(') and content.endswith(')'):
+            clean_results.append(content)
+        else:
+            # Strip all parentheses and add exactly one pair
+            stripped = content.strip('()')
+            clean_results.append(f"({stripped})")
+    
+    return clean_results
+
+
 # Refer the utils functions of the official GraphRAG implementation:
 # https://github.com/microsoft/graphrag
 def clean_str(input: Any) -> str:

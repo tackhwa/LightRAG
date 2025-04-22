@@ -124,6 +124,10 @@ class LightRAG:
         default=int(os.getenv("FORCE_LLM_SUMMARY_ON_MERGE", 6))
     )
 
+    fixed_parenthesized_strategy: str = field(
+        default=int(os.getenv("FIXED_PARENTHESIZED_STRATEGY", "close_schema"))
+    )
+
     # Text chunking
     # ---
 
